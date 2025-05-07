@@ -1,0 +1,73 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Damethri George"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(rpart)
+library(randomForest)
+library(gbm)
+library(e1071)
+library(ggplot2)
+```
+
+# Executive Summary
+
+This report aims to predict the manner in which participants performed barbell lifts using data collected from accelerometers on various body parts. We use cross-validation and Random Forests to achieve high predictive accuracy and apply the final model to 20 test cases.
+
+# Load and Prepare Data
+
+```{r load-data}
+# Download training and test sets if not present
+training_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_file <- "pml-training.csv"
+test_file <- "pml-testing.csv"
+
+if (!file.exists(train_file)) download.file(training_url, destfile=train_file, method="curl")
+if (!file.exists(test_file)) download.file(testing_url, destfile=test_file, method="curl")
+
+training_raw <- read.csv(train_file, na.strings=c("NA", "", "#DIV/0!"))
+testing_raw <- read.csv(test_file, na.strings=c("NA", "", "#DIV/0!"))
+```
+
+# Data Cleaning
+
+```{r clean-data}
+training_raw <- training_raw[, colSums(is.na(training_raw)) == 0]
+training_raw <- training_raw[, -(1:7)] # remove irrelevant columns
+training_raw$classe <- as.factor(training_raw$classe)
+
+set.seed(1234)
+inTrain <- createDataPartition(training_raw$classe, p=0.7, list=FALSE)
+training <- training_raw[inTrain,]
+testing <- training_raw[-inTrain,]
+```
+
+# Model Training
+
+```{r model-training}
+set.seed(1234)
+control <- trainControl(method="cv", number=5, verboseIter=FALSE)
+model_rf <- train(classe ~ ., data=training, method="rf", trControl=control)
+model_rf
+```
+
+# Model Evaluation
+
+```{r model-evaluation}
+predictions <- predict(model_rf, testing)
+confusionMatrix(predictions, testing$classe)
+```
+
+# Prediction on Test Set
+
+```{r test-prediction}
+final_predictions <- predict(model_rf, testing_raw)
+final_predictions
+```
